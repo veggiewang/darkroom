@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ChevronLeft, Save, Maximize, Settings2, CheckCircle2, X } from 'lucide-react';
+import { ChevronLeft, Save, Maximize, CheckCircle2, X, Focus, Gauge, MapPin, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import type { RollMetadata, FrameMetadata } from '../../types';
+import { LocationInput } from '../LocationInput';
 
 interface WorkspaceProps {
   rollMetadata: RollMetadata;
@@ -60,16 +61,22 @@ export default function WorkspaceCanvas({ rollMetadata, onBack }: WorkspaceProps
         camera_make_model: rollMetadata.cameraMakeModel || '',
         lens: rollMetadata.lens || '',
         film_stock: `${rollMetadata.filmStock.brand} ${rollMetadata.filmStock.name} (${rollMetadata.filmStock.format})`,
-        iso: rollMetadata.filmStock.iso.toString(),
-        location: rollMetadata.location || null,
-        latitude: rollMetadata.latitude ?? null,
-        longitude: rollMetadata.longitude ?? null,
+        // ISO: 优先使用帧级别 > 卷级别 > 胶片标称
+        iso: frame.iso || rollMetadata.iso || rollMetadata.filmStock.iso.toString(),
+        // 位置: 优先使用帧级别 > 卷级别
+        location: frame.location || rollMetadata.location || null,
+        latitude: frame.latitude ?? rollMetadata.latitude ?? null,
+        longitude: frame.longitude ?? rollMetadata.longitude ?? null,
         date_shot: rollMetadata.dateShot || null,
         developer: rollMetadata.developer || null,
         scanner: rollMetadata.scanner || null,
+        author: rollMetadata.author || null,
+        // EV: 优先使用帧级别 > 卷级别
+        ev: frame.ev || rollMetadata.ev || null,
         aperture: frame.aperture || null,
         shutter_speed: frame.shutterSpeed || null,
         notes: frame.notes || null,
+        focal_length: frame.focalLength || null,
       }));
 
       console.log("Submitting EXIF tasks:", tasks);
@@ -152,9 +159,6 @@ export default function WorkspaceCanvas({ rollMetadata, onBack }: WorkspaceProps
         </div>
 
         <div className="flex items-center space-x-3">
-          <button className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-900 rounded-lg transition-colors">
-            <Settings2 size={18} />
-          </button>
           <button 
             onClick={handleWriteExif}
             disabled={isWriting}
@@ -219,51 +223,112 @@ export default function WorkspaceCanvas({ rollMetadata, onBack }: WorkspaceProps
         </div>
 
         {/* Right: Rapid Keyboard Entry Panel */}
-        <div className="w-80 border-l border-zinc-900 bg-zinc-950/50 p-6 flex flex-col z-10 shrink-0">
-          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">单帧曝光参数</h3>
+        <div className="w-80 border-l border-zinc-900 bg-zinc-950/50 flex flex-col z-10 shrink-0">
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6 px-6 pt-6">单帧曝光参数</h3>
           
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-400">光圈 (Aperture)</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono">f/</span>
+          {/* 可滚动区域 */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-6">
+            <div className="space-y-4 pb-6">
+              {/* 摄影三要素 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-400">光圈 (Aperture)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono">f/</span>
+                  <input 
+                    type="text" 
+                    value={activeFrame.aperture || ''}
+                    onChange={(e) => updateActiveFrame({ aperture: e.target.value })}
+                    placeholder="8"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-10 pr-4 text-white font-mono text-lg focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-400">快门速度 (Shutter)</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={activeFrame.shutterSpeed || ''}
+                    onChange={(e) => updateActiveFrame({ shutterSpeed: e.target.value })}
+                    placeholder="1/250"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-white font-mono text-lg focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono">s</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                  <Film size={14} className="text-zinc-500" />
+                  ISO 感光度
+                </label>
                 <input 
                   type="text" 
-                  value={activeFrame.aperture || ''}
-                  onChange={(e) => updateActiveFrame({ aperture: e.target.value })}
-                  placeholder="8"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-10 pr-4 text-white font-mono text-lg focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700"
-                  autoFocus
+                  value={activeFrame.iso || ''}
+                  onChange={(e) => updateActiveFrame({ iso: e.target.value })}
+                  placeholder={rollMetadata.iso || `${rollMetadata.filmStock.iso}`}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-2.5 px-4 text-white font-mono focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700"
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-400">快门速度 (Shutter)</label>
-              <div className="relative">
+              {/* 其他参数 */}
+              <div className="space-y-2 pt-2 border-t border-zinc-900">
+                <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                  <Focus size={14} className="text-zinc-500" />
+                  焦距 (mm)
+                </label>
                 <input 
                   type="text" 
-                  value={activeFrame.shutterSpeed || ''}
-                  onChange={(e) => updateActiveFrame({ shutterSpeed: e.target.value })}
-                  placeholder="1/250"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-white font-mono text-lg focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700"
+                  value={activeFrame.focalLength || ''}
+                  onChange={(e) => updateActiveFrame({ focalLength: e.target.value })}
+                  placeholder="50"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-2.5 px-4 text-white font-mono focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono">s</span>
               </div>
-            </div>
 
-            <div className="space-y-2 pt-4 border-t border-zinc-900">
-              <label className="text-sm font-medium text-zinc-400">备注 (Notes/Caption)</label>
-              <textarea 
-                value={activeFrame.notes || ''}
-                onChange={(e) => updateActiveFrame({ notes: e.target.value })}
-                placeholder="拍摄地点或冲洗要求..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-white text-sm focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700 resize-none h-24 custom-scrollbar"
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                  <Gauge size={14} className="text-zinc-500" />
+                  曝光补偿 (EV)
+                </label>
+                <input 
+                  type="text" 
+                  value={activeFrame.ev || ''}
+                  onChange={(e) => updateActiveFrame({ ev: e.target.value })}
+                  placeholder="0"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-2.5 px-4 text-white font-mono focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                  <MapPin size={14} className="text-zinc-500" />
+                  拍摄地点
+                </label>
+                <LocationInput
+                  value={activeFrame.location || ''}
+                  onChange={(val: string, lat?: number, lon?: number) => updateActiveFrame({ location: val, latitude: lat, longitude: lon })}
+                  placeholder="搜索地点..."
+                />
+              </div>
+
+              {/* 备注放最下面 */}
+              <div className="space-y-2 pt-2 border-t border-zinc-900">
+                <label className="text-sm font-medium text-zinc-400">备注 (Notes)</label>
+                <textarea 
+                  value={activeFrame.notes || ''}
+                  onChange={(e) => updateActiveFrame({ notes: e.target.value })}
+                  placeholder="拍摄说明或备注..."
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-white text-sm focus:border-zinc-500 focus:bg-zinc-800 outline-none transition-all placeholder:text-zinc-700 resize-none h-20"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="mt-auto pt-6 text-xs text-zinc-600 flex flex-col space-y-2">
+          {/* 固定在底部的快捷键提示 */}
+          <div className="px-6 pb-6 pt-4 text-xs text-zinc-600 flex flex-col space-y-2 border-t border-zinc-900">
             <div className="flex justify-between">
               <span>下一帧</span>
               <kbd className="font-mono bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">Enter / ↓</kbd>

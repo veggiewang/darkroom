@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ChevronRight, X, Upload, Camera, Aperture, Calendar, Film, Store, ScanLine } from 'lucide-react';
+import { Search, ChevronRight, X, Upload, Camera, Aperture, Calendar, Film, Store, ScanLine, User, Gauge } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -177,7 +177,7 @@ export default function App() {
   ];
 
   const COMMON_LENSES = [
-    'Summicron 35mm f/2', 'Summilux 50mm f/1.4', 'Elmarit 28mm f/2.8',
+    'Summicron 35mm f/2', 'Elmarit 28mm f/2.8',
     'Planar 80mm f/2.8', 'Distagon 50mm f/1.4',
     '50mm f/1.4', '50mm f/1.8', '35mm f/2.8', '28mm f/2.8'
   ];
@@ -192,6 +192,10 @@ export default function App() {
     'Heidelberg Tango Drum Scanner'
   ];
 
+  // BMP 转换弹窗状态
+  const [bmpDialog, setBmpDialog] = useState<{show: boolean, bmpFiles: any[], allFiles: any[], nonBmpFiles: any[]} | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
+
   // 导入并扫描目录
   const handleSelectDirectory = async () => {
     try {
@@ -201,19 +205,23 @@ export default function App() {
       });
       
       if (selected) {
-        // 调用 Rust 后端扫描目录
         const result: any = await invoke('scan_directory', { path: selected });
         
         if (result.files && result.files.length > 0) {
-          // 确保把扫描到的文件列表一起合并到 rollData 状态里
-          const updatedRollData = {
-            ...rollData,
-            filmStock: selectedFilm!,
-            importedFiles: result.files
-          };
+          const bmpFiles = result.files.filter((f: any) => f.format === 'bmp');
+          const nonBmpFiles = result.files.filter((f: any) => f.format !== 'bmp');
           
-          setRollData(updatedRollData);
-          // 手动进入工作台，不再自动跳转
+          if (bmpFiles.length > 0) {
+            // 有 BMP 文件，弹窗询问
+            setBmpDialog({ show: true, bmpFiles, allFiles: result.files, nonBmpFiles });
+          } else {
+            // 没有 BMP，直接导入
+            setRollData({
+              ...rollData,
+              filmStock: selectedFilm!,
+              importedFiles: result.files
+            });
+          }
         } else {
           alert('该文件夹下没有找到支持的图片格式 (JPG, TIFF, BMP)');
         }
@@ -222,6 +230,46 @@ export default function App() {
       console.error('Failed to open directory:', err);
       alert(`无法打开文件夹选择器: ${err}`);
     }
+  };
+
+  // 用户选择转换 BMP
+  const handleConvertBmp = async () => {
+    if (!bmpDialog) return;
+    setIsConverting(true);
+    try {
+      const bmpPaths = bmpDialog.bmpFiles.map((f: any) => f.path);
+      const result: any = await invoke('convert_bmp_to_tiff', { bmpPaths });
+      
+      // 合并：非 BMP 文件 + 转换后的 TIFF 文件
+      const finalFiles = [...bmpDialog.nonBmpFiles, ...result.files].sort(
+        (a: any, b: any) => a.name.localeCompare(b.name)
+      );
+      
+      setRollData({
+        ...rollData,
+        filmStock: selectedFilm!,
+        importedFiles: finalFiles
+      });
+      setBmpDialog(null);
+    } catch (err) {
+      console.error('BMP conversion failed:', err);
+      alert(`转换失败: ${err}`);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  // 用户选择跳过 BMP（只导入非 BMP 文件）
+  const handleSkipBmp = () => {
+    if (!bmpDialog) return;
+    if (bmpDialog.nonBmpFiles.length > 0) {
+      setRollData({
+        ...rollData,
+        filmStock: selectedFilm!,
+        importedFiles: bmpDialog.nonBmpFiles
+      });
+    }
+    setBmpDialog(null);
   };
 
   // 进入工作台
@@ -519,6 +567,45 @@ export default function App() {
                        options={COMMON_SCANNERS}
                      />
                    </div>
+                   <div className="space-y-2">
+                     <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                       <Film size={16} className="text-zinc-500" /> 
+                       ISO 感光度
+                     </label>
+                     <input
+                       type="text"
+                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-100 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 outline-none transition-all placeholder:text-zinc-700"
+                       placeholder={`默认: ${selectedFilm?.iso || '100'}`}
+                       value={rollData.iso || ''}
+                       onChange={e => setRollData({...rollData, iso: e.target.value})}
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                       <Gauge size={16} className="text-zinc-500" /> 
+                       曝光补偿 (EV)
+                     </label>
+                     <input
+                       type="text"
+                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-100 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 outline-none transition-all placeholder:text-zinc-700"
+                       placeholder="例如: +1, -0.5, 0"
+                       value={rollData.ev || ''}
+                       onChange={e => setRollData({...rollData, ev: e.target.value})}
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                       <User size={16} className="text-zinc-500" /> 
+                       摄影师 / 作者
+                     </label>
+                     <input
+                       type="text"
+                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-100 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 outline-none transition-all placeholder:text-zinc-700"
+                       placeholder="例如: 你的名字"
+                       value={rollData.author || ''}
+                       onChange={e => setRollData({...rollData, author: e.target.value})}
+                     />
+                   </div>
                 </div>
 
                 {/* 3. 导入照片文件夹 (Dropzone) */}
@@ -573,6 +660,83 @@ export default function App() {
                  >
                    进入暗房工作台
                  </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* BMP 转换确认弹窗 */}
+      <AnimatePresence>
+        {bmpDialog?.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30">
+                    <span className="text-yellow-500 text-lg">⚠</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white">检测到 BMP 文件</h3>
+                </div>
+
+                <p className="text-sm text-zinc-400 mb-3">
+                  发现 <span className="text-yellow-400 font-bold">{bmpDialog.bmpFiles.length}</span> 个 BMP 文件。BMP 格式不支持写入 EXIF 元数据。
+                </p>
+                <p className="text-sm text-zinc-400 mb-4">
+                  是否将它们转换为 TIFF 格式？
+                </p>
+
+                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 mb-4">
+                  <p className="text-xs text-red-400 font-medium flex items-center gap-1.5">
+                    <span>⚠</span>
+                    此操作将直接修改原始文件（BMP → TIFF），不可撤销
+                  </p>
+                </div>
+
+                <div className="text-xs text-zinc-600 mb-1">涉及文件：</div>
+                <div className="max-h-24 overflow-y-auto custom-scrollbar bg-zinc-950 rounded-lg p-2 mb-4">
+                  {bmpDialog.bmpFiles.map((f: any, i: number) => (
+                    <div key={i} className="text-xs text-zinc-500 font-mono truncate py-0.5">{f.name}</div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-zinc-800 bg-zinc-950/80 flex justify-end gap-3">
+                <button
+                  onClick={handleSkipBmp}
+                  disabled={isConverting}
+                  className="px-5 py-2 text-sm text-zinc-400 hover:text-white font-medium transition-colors"
+                >
+                  {bmpDialog.nonBmpFiles.length > 0 ? '跳过 BMP，仅导入其他文件' : '取消'}
+                </button>
+                <button
+                  onClick={handleConvertBmp}
+                  disabled={isConverting}
+                  className="px-5 py-2 text-sm bg-yellow-600 hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isConverting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      转换中...
+                    </>
+                  ) : (
+                    `转换为 TIFF (${bmpDialog.bmpFiles.length} 个文件)`
+                  )}
+                </button>
               </div>
             </motion.div>
           </motion.div>

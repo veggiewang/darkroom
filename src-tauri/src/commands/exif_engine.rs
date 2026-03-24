@@ -16,9 +16,12 @@ pub struct ExifTask {
     pub date_shot: Option<String>,
     pub developer: Option<String>,
     pub scanner: Option<String>,
+    pub author: Option<String>,
+    pub ev: Option<String>,
     pub aperture: Option<String>,
     pub shutter_speed: Option<String>,
     pub notes: Option<String>,
+    pub focal_length: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -37,6 +40,17 @@ pub async fn write_exif_batch(tasks: Vec<ExifTask>) -> Result<Vec<ProcessResult>
     // 如果没有，这步会报错提示用户安装
     
     for task in tasks {
+        // BMP 文件不支持 EXIF 写入，直接跳过并提示
+        let lower_path = task.file_path.to_lowercase();
+        if lower_path.ends_with(".bmp") {
+            results.push(ProcessResult {
+                success: false,
+                file_path: task.file_path,
+                error_message: Some("BMP 格式不支持写入 EXIF，请先转换为 TIFF 或 JPG".to_string()),
+            });
+            continue;
+        }
+
         let exiftool_path = "/usr/local/bin/exiftool"; // Mac 上的常见路径
         let mut cmd = Command::new(exiftool_path);
         
@@ -94,11 +108,22 @@ pub async fn write_exif_batch(tasks: Vec<ExifTask>) -> Result<Vec<ProcessResult>
             cmd.arg(format!("-GPSLongitudeRef={}", lon_ref));
         }
 
-        if let Some(scanner) = &task.scanner {
-            if !scanner.is_empty() {
-                // 写入扫描仪设备信息，使用原生的EXIF Scanner/Model标签
-                cmd.arg(format!("-ScannerMake={}", scanner.split(' ').next().unwrap_or("Unknown")));
-                cmd.arg(format!("-ScannerModel={}", scanner));
+        // 扫描仪信息已包含在 UserComment 中，不需要单独写标签
+
+        // === 作者 ===
+        if let Some(author) = &task.author {
+            if !author.is_empty() {
+                cmd.arg(format!("-Artist={}", author));
+                cmd.arg(format!("-XMP:Creator={}", author));
+                cmd.arg(format!("-IPTC:By-line={}", author));
+                cmd.arg(format!("-Copyright=© {}", author));
+            }
+        }
+
+        // === 曝光补偿 (EV) ===
+        if let Some(ev) = &task.ev {
+            if !ev.is_empty() {
+                cmd.arg(format!("-ExposureCompensation={}", ev));
             }
         }
 
@@ -122,6 +147,12 @@ pub async fn write_exif_batch(tasks: Vec<ExifTask>) -> Result<Vec<ProcessResult>
         if let Some(shutter) = &task.shutter_speed {
             if !shutter.is_empty() {
                 cmd.arg(format!("-ExposureTime={}", shutter));
+            }
+        }
+
+        if let Some(focal_length) = &task.focal_length {
+            if !focal_length.is_empty() {
+                cmd.arg(format!("-FocalLength={}", focal_length));
             }
         }
 

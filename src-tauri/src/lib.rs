@@ -9,6 +9,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::fs_handler::scan_directory,
+            commands::fs_handler::convert_bmp_to_tiff,
             commands::exif_engine::write_exif_batch
         ])
         .run(tauri::generate_context!())

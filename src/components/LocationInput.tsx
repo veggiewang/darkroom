@@ -4,9 +4,10 @@ import { MapPin, Loader2 } from 'lucide-react';
 interface LocationInputProps {
   value: string;
   onChange: (val: string, lat?: number, lon?: number) => void;
+  placeholder?: string;
 }
 
-export function LocationInput({ value, onChange }: LocationInputProps) {
+export function LocationInput({ value, onChange, placeholder = "搜索拍摄地点..." }: LocationInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -81,7 +82,7 @@ export function LocationInput({ value, onChange }: LocationInputProps) {
         </div>
         <input 
           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 pl-11 pr-4 text-zinc-100 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 outline-none transition-all placeholder:text-zinc-700"
-          placeholder="例如: 日本 东京 / 新疆 西藏..."
+          placeholder={placeholder}
           value={value}
           onChange={handleInputChange}
           onFocus={() => {
