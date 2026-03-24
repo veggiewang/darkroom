@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <!-- Background: rounded dark square -->
+  <rect width="1024" height="1024" rx="220" fill="#09090b"/>
+  
+  <!-- Subtle radial glow behind canister -->
+  <radialGradient id="bg-glow" cx="50%" cy="45%" r="40%">
+    <stop offset="0%" stop-color="#facc15" stop-opacity="0.12"/>
+    <stop offset="100%" stop-color="#09090b" stop-opacity="0"/>
+  </radialGradient>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg-glow)"/>
+
+  <!-- Film Canister - centered and scaled up -->
+  <g transform="translate(512,500) scale(5.5) translate(-50,-50)">
+    <!-- 3D Drop Shadow -->
+    <ellipse cx="50" cy="87" rx="28" ry="8" fill="rgba(0,0,0,0.6)" />
+
+    <!-- Main Body -->
+    <rect x="25" y="20" width="50" height="60" rx="2" fill="#1a1a1a" />
+    
+    <!-- Extruding Lip -->
+    <path d="M73 35 L82 37 L82 63 L73 65 Z" fill="#111" />
+    
+    <!-- Film Strip peeking out -->
+    <path d="M82 38 L95 40 L95 60 L82 62 Z" fill="#5d4037" opacity="0.9" />
+    <!-- Sprockets -->
+    <rect x="85" y="42" width="3" height="3" fill="#111" transform="skewY(10)" />
+    <rect x="85" y="48" width="3" height="3" fill="#111" transform="skewY(10)" />
+    <rect x="85" y="54" width="3" height="3" fill="#111" transform="skewY(10)" />
+
+    <!-- Brand Label Area - Kodak-style gold to red gradient -->
+    <rect x="25" y="32" width="50" height="36" fill="url(#label-grad)" />
+    
+    <!-- Subtle label texture lines -->
+    <line x1="25" y1="40" x2="75" y2="40" stroke="rgba(0,0,0,0.15)" stroke-width="0.5"/>
+    <line x1="25" y1="48" x2="75" y2="48" stroke="rgba(0,0,0,0.1)" stroke-width="0.5"/>
+    <line x1="25" y1="56" x2="75" y2="56" stroke="rgba(0,0,0,0.15)" stroke-width="0.5"/>
+
+    <!-- Label Text -->
+    <text x="50" y="46" font-family="system-ui, -apple-system, 'Helvetica Neue', sans-serif" font-size="7" font-weight="900" fill="#000" text-anchor="middle" letter-spacing="0.5" opacity="0.8">
+      DARKROOM
+    </text>
+    <text x="50" y="58" font-family="'SF Mono', 'Menlo', monospace" font-size="10" font-weight="900" fill="#000" text-anchor="middle" letter-spacing="1" opacity="0.7">
+      D
+    </text>
+
+    <!-- Lighting/Reflection -->
+    <rect x="30" y="20" width="3" height="60" fill="white" opacity="0.12" />
+    <rect x="66" y="20" width="5" height="60" fill="black" opacity="0.25" />
+
+    <!-- Top Cap -->
+    <ellipse cx="50" cy="20" rx="25" ry="7" fill="#c0c0c0" />
+    <ellipse cx="50" cy="18.5" rx="23" ry="5.5" fill="#e8e8e8" />
+    <ellipse cx="50" cy="18.5" rx="15" ry="3" fill="#a0a0a0" />
+    <!-- Nipple/Spool -->
+    <rect x="44" y="10" width="12" height="9" rx="1" fill="#b0b0b0" />
+    <ellipse cx="50" cy="10" rx="6" ry="2.2" fill="#d0d0d0" />
+
+    <!-- Bottom Cap -->
+    <ellipse cx="50" cy="80" rx="25" ry="7" fill="#aaa" />
+    <path d="M25 80 Q 50 87 75 80 L 75 78 Q 50 85 25 78 Z" fill="#888" />
+  </g>
+
+  <defs>
+    <linearGradient id="label-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#facc15"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+  </defs>
+</svg>
