@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, Save, Maximize, CheckCircle2, X, Focus, Gauge, MapPin, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
@@ -37,6 +37,41 @@ export default function WorkspaceCanvas({ rollMetadata, onBack }: WorkspaceProps
   const [activeFrameIndex, setActiveFrameIndex] = useState(0);
   const [isWriting, setIsWriting] = useState(false);
   const [writeResult, setWriteResult] = useState<{show: boolean, success: number, failed: number, errors: any[]} | null>(null);
+
+  // 键盘快捷键处理 (Enter/↓: 下一帧, ↑: 上一帧)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (activeFrameIndex < frames.length - 1) {
+          const nextIndex = activeFrameIndex + 1;
+          setActiveFrameIndex(nextIndex);
+          // 自动继承当前帧的参数给下一帧
+          const currentFrame = frames[activeFrameIndex];
+          setFrames(prev => {
+            const newFrames = [...prev];
+            newFrames[nextIndex] = {
+              ...newFrames[nextIndex],
+              aperture: currentFrame.aperture || newFrames[nextIndex].aperture,
+              shutterSpeed: currentFrame.shutterSpeed || newFrames[nextIndex].shutterSpeed,
+              iso: currentFrame.iso || newFrames[nextIndex].iso,
+              focalLength: currentFrame.focalLength || newFrames[nextIndex].focalLength,
+              ev: currentFrame.ev || newFrames[nextIndex].ev,
+            };
+            return newFrames;
+          });
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (activeFrameIndex > 0) {
+          setActiveFrameIndex(activeFrameIndex - 1);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeFrameIndex, frames]);
 
   // 防御性检查（在所有 hooks 之后）
   if (!rollMetadata || !rollMetadata.filmStock) {

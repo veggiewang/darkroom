@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, ChevronRight, X, Upload, Camera, Aperture, Calendar, Film, Store, ScanLine, User, Gauge } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -58,18 +58,47 @@ const FILM_DATABASE: FilmStock[] = [
     boxStyle: '', accent: '', colorStart: '#18181b', colorEnd: '#000000', textColor: '#ffffff'
   },
   { 
+    id: 'k_tmax400_135', brand: 'Kodak', name: 'T-Max 400', type: '黑白负片', iso: 400, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#18181b', colorEnd: '#000000', textColor: '#ffffff'
+  },
+  { 
     id: 'k_e100_135', brand: 'Kodak', name: 'Ektachrome E100', type: '彩色反转片', iso: 100, format: '135', popular: false,
     boxStyle: '', accent: '', colorStart: '#3b82f6', colorEnd: '#1d4ed8', textColor: '#ffffff'
+  },
+  // 电影卷 (分装卷)
+  { 
+    id: 'k_v350d_135', brand: 'Kodak', name: 'Vision3 50D', type: '彩色电影卷', iso: 50, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#f59e0b', colorEnd: '#b45309', textColor: '#000000'
+  },
+  { 
+    id: 'k_v3250d_135', brand: 'Kodak', name: 'Vision3 250D', type: '彩色电影卷', iso: 250, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#fbbf24', colorEnd: '#ea580c', textColor: '#000000'
+  },
+  { 
+    id: 'k_v3200t_135', brand: 'Kodak', name: 'Vision3 200T', type: '彩色电影卷', iso: 200, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#3b82f6', colorEnd: '#1e40af', textColor: '#ffffff'
+  },
+  { 
+    id: 'k_v3500t_135', brand: 'Kodak', name: 'Vision3 500T', type: '彩色电影卷', iso: 500, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#6366f1', colorEnd: '#312e81', textColor: '#ffffff'
   },
 
   // === 135 FORMAT - FUJIFILM ===
   { 
-    id: 'f_pro400h_135', brand: 'Fujifilm', name: 'Pro 400H', type: '彩色负片', iso: 400, format: '135', popular: true,
+    id: 'f_pro400h_135', brand: 'Fujifilm', name: 'Pro 400H', type: '彩色负片 (已停产)', iso: 400, format: '135', popular: true,
     boxStyle: '', accent: '', colorStart: '#ccfbf1', colorEnd: '#5eead4', textColor: '#042f2e'
   },
   { 
-    id: 'f_c200_135', brand: 'Fujifilm', name: 'Fujicolor C200', type: '彩色负片', iso: 200, format: '135', popular: true,
+    id: 'f_c100_135', brand: 'Fujifilm', name: 'Fujicolor C100', type: '彩色负片', iso: 100, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#86efac', colorEnd: '#16a34a', textColor: '#ffffff'
+  },
+  { 
+    id: 'f_c200_135', brand: 'Fujifilm', name: 'Fujicolor C200', type: '彩色负片 (已停产)', iso: 200, format: '135', popular: true,
     boxStyle: '', accent: '', colorStart: '#22c55e', colorEnd: '#15803d', textColor: '#ffffff'
+  },
+  { 
+    id: 'f_c400_135', brand: 'Fujifilm', name: 'Fujicolor C400', type: '彩色负片', iso: 400, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#16a34a', colorEnd: '#14532d', textColor: '#ffffff'
   },
   { 
     id: 'f_xtra400_135', brand: 'Fujifilm', name: 'Superia X-TRA 400', type: '彩色负片', iso: 400, format: '135', popular: false,
@@ -80,7 +109,11 @@ const FILM_DATABASE: FilmStock[] = [
     boxStyle: '', accent: '', colorStart: '#bbf7d0', colorEnd: '#16a34a', textColor: '#000000'
   },
   { 
-    id: 'f_acros100_135', brand: 'Fujifilm', name: 'Neopan Acros 100', type: '黑白负片', iso: 100, format: '135', popular: false,
+    id: 'f_biz400_135', brand: 'Fujifilm', name: '业务卷 400', type: '彩色负片 (已停产)', iso: 400, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#cbd5e1', colorEnd: '#475569', textColor: '#ffffff'
+  },
+  { 
+    id: 'f_acros100ii_135', brand: 'Fujifilm', name: 'Acros 100 II', type: '黑白负片', iso: 100, format: '135', popular: true,
     boxStyle: '', accent: '', colorStart: '#f1f5f9', colorEnd: '#94a3b8', textColor: '#000000'
   },
   { 
@@ -88,25 +121,110 @@ const FILM_DATABASE: FilmStock[] = [
     boxStyle: '', accent: '', colorStart: '#16a34a', colorEnd: '#b91c1c', textColor: '#ffffff'
   },
   { 
+    id: 'f_velvia100_135', brand: 'Fujifilm', name: 'Velvia 100', type: '彩色反转片', iso: 100, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#22c55e', colorEnd: '#dc2626', textColor: '#ffffff'
+  },
+  { 
     id: 'f_provia100f_135', brand: 'Fujifilm', name: 'Provia 100F', type: '彩色反转片', iso: 100, format: '135', popular: false,
     boxStyle: '', accent: '', colorStart: '#38bdf8', colorEnd: '#0369a1', textColor: '#ffffff'
   },
 
-  // === 135 FORMAT - OTHERS ===
+  // === 135 FORMAT - ILFORD ===
   { 
     id: 'i_hp5_135', brand: 'Ilford', name: 'HP5 Plus', type: '黑白负片', iso: 400, format: '135', popular: true,
     boxStyle: '', accent: '', colorStart: '#18181b', colorEnd: '#27272a', textColor: '#ffffff'
   },
   { 
+    id: 'i_fp4_135', brand: 'Ilford', name: 'FP4 Plus', type: '黑白负片', iso: 125, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#e2e8f0', colorEnd: '#94a3b8', textColor: '#000000'
+  },
+  { 
+    id: 'i_delta100_135', brand: 'Ilford', name: 'Delta 100', type: '黑白负片', iso: 100, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#cbd5e1', colorEnd: '#475569', textColor: '#000000'
+  },
+  { 
+    id: 'i_delta400_135', brand: 'Ilford', name: 'Delta 400', type: '黑白负片', iso: 400, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#64748b', colorEnd: '#1e293b', textColor: '#ffffff'
+  },
+  { 
+    id: 'i_delta3200_135', brand: 'Ilford', name: 'Delta 3200', type: '黑白负片', iso: 3200, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#0f172a', colorEnd: '#000000', textColor: '#ffffff'
+  },
+  { 
+    id: 'i_pan100_135', brand: 'Ilford', name: 'PAN 100', type: '黑白负片', iso: 100, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#f1f5f9', colorEnd: '#64748b', textColor: '#000000'
+  },
+  { 
+    id: 'i_pan400_135', brand: 'Ilford', name: 'PAN 400', type: '黑白负片', iso: 400, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#94a3b8', colorEnd: '#334155', textColor: '#ffffff'
+  },
+  { 
+    id: 'i_kent100_135', brand: 'Ilford', name: 'Kentmere PAN 100', type: '黑白负片', iso: 100, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#e2e8f0', colorEnd: '#64748b', textColor: '#000000'
+  },
+  { 
+    id: 'i_kent400_135', brand: 'Ilford', name: 'Kentmere PAN 400', type: '黑白负片', iso: 400, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#71717a', colorEnd: '#27272a', textColor: '#ffffff'
+  },
+  { 
+    id: 'i_phoenix200_135', brand: 'Ilford', name: 'Phoenix 200', type: '彩色负片', iso: 200, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fbbf24', colorEnd: '#dc2626', textColor: '#000000'
+  },
+
+  // === 135 FORMAT - CINESTILL ===
+  { 
+    id: 'c_50d_135', brand: 'CineStill', name: '50D', type: '彩色电影卷', iso: 50, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fef3c7', colorEnd: '#fcd34d', textColor: '#000000'
+  },
+  { 
+    id: 'c_400d_135', brand: 'CineStill', name: '400D', type: '彩色电影卷', iso: 400, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fef08a', colorEnd: '#eab308', textColor: '#000000'
+  },
+  { 
     id: 'c_800t_135', brand: 'CineStill', name: '800T', type: '彩色电影卷', iso: 800, format: '135', popular: true,
     boxStyle: '', accent: '', colorStart: '#09090b', colorEnd: '#18181b', textColor: '#ef4444'
   },
+
+  // === 135 FORMAT - LUCKY (乐凯) ===
   { 
-    id: 'l_c200_135', brand: 'Lucky', name: 'Color 200', type: '彩色负片 (乐凯)', iso: 200, format: '135', popular: true,
+    id: 'l_c200_135', brand: 'Lucky', name: 'Color 200', type: '彩色负片', iso: 200, format: '135', popular: true,
     boxStyle: '', accent: '', colorStart: '#b91c1c', colorEnd: '#7f1d1d', textColor: '#facc15'
+  },
+  { 
+    id: 'l_shd100_135', brand: 'Lucky', name: 'SHD 100', type: '黑白负片', iso: 100, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#fef3c7', colorEnd: '#b91c1c', textColor: '#000000'
+  },
+  { 
+    id: 'l_shd400_135', brand: 'Lucky', name: 'SHD 400', type: '黑白负片', iso: 400, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fcd34d', colorEnd: '#7f1d1d', textColor: '#000000'
+  },
+
+  // === 135 FORMAT - FOMA ===
+  { 
+    id: 'fo_100_135', brand: 'FOMA', name: 'Fomapan 100', type: '黑白负片', iso: 100, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#e2e8f0', colorEnd: '#475569', textColor: '#000000'
+  },
+  { 
+    id: 'fo_200_135', brand: 'FOMA', name: 'Fomapan 200', type: '黑白负片', iso: 200, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#cbd5e1', colorEnd: '#334155', textColor: '#000000'
+  },
+  { 
+    id: 'fo_400_135', brand: 'FOMA', name: 'Fomapan 400', type: '黑白负片', iso: 400, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#94a3b8', colorEnd: '#1e293b', textColor: '#ffffff'
+  },
+
+  // === 135 FORMAT - ROLLEI ===
+  { 
+    id: 'r_retro400_135', brand: 'Rollei', name: 'Retro 400S', type: '黑白负片', iso: 400, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#44403c', colorEnd: '#1c1917', textColor: '#fbbf24'
+  },
+  { 
+    id: 'r_rpx400_135', brand: 'Rollei', name: 'RPX 400', type: '黑白负片', iso: 400, format: '135', popular: false,
+    boxStyle: '', accent: '', colorStart: '#57534e', colorEnd: '#292524', textColor: '#ffffff'
   },
 
   // === 120 FORMAT ===
+  // Kodak 120
   { 
     id: 'k_p400_120', brand: 'Kodak', name: 'Portra 400', type: '彩色负片', iso: 400, format: '120', popular: true,
     boxStyle: '', accent: '', colorStart: '#facc15', colorEnd: '#ef4444', textColor: '#000000'
@@ -116,33 +234,53 @@ const FILM_DATABASE: FilmStock[] = [
     boxStyle: '', accent: '', colorStart: '#fef08a', colorEnd: '#fb923c', textColor: '#000000'
   },
   { 
+    id: 'k_p800_120', brand: 'Kodak', name: 'Portra 800', type: '彩色负片', iso: 800, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#f97316', colorEnd: '#991b1b', textColor: '#000000'
+  },
+  { 
     id: 'k_ektar100_120', brand: 'Kodak', name: 'Ektar 100', type: '彩色负片', iso: 100, format: '120', popular: false,
     boxStyle: '', accent: '', colorStart: '#ef4444', colorEnd: '#7f1d1d', textColor: '#ffffff'
+  },
+  { 
+    id: 'k_trix_120', brand: 'Kodak', name: 'Tri-X 400', type: '黑白负片', iso: 400, format: '120', popular: true,
+    boxStyle: '', accent: '', colorStart: '#000000', colorEnd: '#111111', textColor: '#eab308'
+  },
+  { 
+    id: 'k_tmax100_120', brand: 'Kodak', name: 'T-Max 100', type: '黑白负片', iso: 100, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#18181b', colorEnd: '#000000', textColor: '#ffffff'
+  },
+  { 
+    id: 'k_tmax400_120', brand: 'Kodak', name: 'T-Max 400', type: '黑白负片', iso: 400, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#18181b', colorEnd: '#000000', textColor: '#ffffff'
   },
   { 
     id: 'k_e100_120', brand: 'Kodak', name: 'Ektachrome E100', type: '彩色反转片', iso: 100, format: '120', popular: false,
     boxStyle: '', accent: '', colorStart: '#3b82f6', colorEnd: '#1d4ed8', textColor: '#ffffff'
   },
+  
+  // Fujifilm 120
   { 
-    id: 'k_trix_120', brand: 'Kodak', name: 'Tri-X 400', type: '黑白负片', iso: 400, format: '120', popular: false,
-    boxStyle: '', accent: '', colorStart: '#000000', colorEnd: '#111111', textColor: '#eab308'
+    id: 'f_pro400h_120', brand: 'Fujifilm', name: 'Pro 400H', type: '彩色负片 (已停产)', iso: 400, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#ccfbf1', colorEnd: '#5eead4', textColor: '#042f2e'
   },
   { 
-    id: 'f_pro400h_120', brand: 'Fujifilm', name: 'Pro 400H', type: '彩色负片', iso: 400, format: '120', popular: false,
-    boxStyle: '', accent: '', colorStart: '#ccfbf1', colorEnd: '#5eead4', textColor: '#042f2e'
+    id: 'f_acros100ii_120', brand: 'Fujifilm', name: 'Acros 100 II', type: '黑白负片', iso: 100, format: '120', popular: true,
+    boxStyle: '', accent: '', colorStart: '#f1f5f9', colorEnd: '#94a3b8', textColor: '#000000'
   },
   { 
     id: 'f_velvia50_120', brand: 'Fujifilm', name: 'Velvia 50', type: '彩色反转片', iso: 50, format: '120', popular: false,
     boxStyle: '', accent: '', colorStart: '#16a34a', colorEnd: '#b91c1c', textColor: '#ffffff'
   },
   { 
+    id: 'f_velvia100_120', brand: 'Fujifilm', name: 'Velvia 100', type: '彩色反转片', iso: 100, format: '120', popular: true,
+    boxStyle: '', accent: '', colorStart: '#22c55e', colorEnd: '#dc2626', textColor: '#ffffff'
+  },
+  { 
     id: 'f_provia100f_120', brand: 'Fujifilm', name: 'Provia 100F', type: '彩色反转片', iso: 100, format: '120', popular: false,
     boxStyle: '', accent: '', colorStart: '#38bdf8', colorEnd: '#0369a1', textColor: '#ffffff'
   },
-  { 
-    id: 'f_acros100_120', brand: 'Fujifilm', name: 'Neopan Acros 100', type: '黑白负片', iso: 100, format: '120', popular: false,
-    boxStyle: '', accent: '', colorStart: '#f1f5f9', colorEnd: '#94a3b8', textColor: '#000000'
-  },
+  
+  // Ilford 120
   { 
     id: 'i_hp5_120', brand: 'Ilford', name: 'HP5 Plus', type: '黑白负片', iso: 400, format: '120', popular: true,
     boxStyle: '', accent: '', colorStart: '#18181b', colorEnd: '#27272a', textColor: '#ffffff'
@@ -152,8 +290,76 @@ const FILM_DATABASE: FilmStock[] = [
     boxStyle: '', accent: '', colorStart: '#e2e8f0', colorEnd: '#94a3b8', textColor: '#000000'
   },
   { 
+    id: 'i_delta100_120', brand: 'Ilford', name: 'Delta 100', type: '黑白负片', iso: 100, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#cbd5e1', colorEnd: '#475569', textColor: '#000000'
+  },
+  { 
+    id: 'i_delta400_120', brand: 'Ilford', name: 'Delta 400', type: '黑白负片', iso: 400, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#64748b', colorEnd: '#1e293b', textColor: '#ffffff'
+  },
+  { 
+    id: 'i_delta3200_120', brand: 'Ilford', name: 'Delta 3200', type: '黑白负片', iso: 3200, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#0f172a', colorEnd: '#000000', textColor: '#ffffff'
+  },
+  { 
+    id: 'i_kent100_120', brand: 'Ilford', name: 'Kentmere PAN 100', type: '黑白负片', iso: 100, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#e2e8f0', colorEnd: '#64748b', textColor: '#000000'
+  },
+  { 
+    id: 'i_kent400_120', brand: 'Ilford', name: 'Kentmere PAN 400', type: '黑白负片', iso: 400, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#71717a', colorEnd: '#27272a', textColor: '#ffffff'
+  },
+  { 
+    id: 'i_phoenix200_120', brand: 'Ilford', name: 'Phoenix 200', type: '彩色负片', iso: 200, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fbbf24', colorEnd: '#dc2626', textColor: '#000000'
+  },
+  
+  // CineStill 120
+  { 
+    id: 'c_50d_120', brand: 'CineStill', name: '50D', type: '彩色电影卷', iso: 50, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fef3c7', colorEnd: '#fcd34d', textColor: '#000000'
+  },
+  { 
+    id: 'c_400d_120', brand: 'CineStill', name: '400D', type: '彩色电影卷', iso: 400, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fef08a', colorEnd: '#eab308', textColor: '#000000'
+  },
+  { 
     id: 'c_800t_120', brand: 'CineStill', name: '800T', type: '彩色电影卷', iso: 800, format: '120', popular: false,
     boxStyle: '', accent: '', colorStart: '#09090b', colorEnd: '#18181b', textColor: '#ef4444'
+  },
+  
+  // FOMA 120
+  { 
+    id: 'fo_100_120', brand: 'FOMA', name: 'Fomapan 100', type: '黑白负片', iso: 100, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#e2e8f0', colorEnd: '#475569', textColor: '#000000'
+  },
+  { 
+    id: 'fo_200_120', brand: 'FOMA', name: 'Fomapan 200', type: '黑白负片', iso: 200, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#cbd5e1', colorEnd: '#334155', textColor: '#000000'
+  },
+  { 
+    id: 'fo_400_120', brand: 'FOMA', name: 'Fomapan 400', type: '黑白负片', iso: 400, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#94a3b8', colorEnd: '#1e293b', textColor: '#ffffff'
+  },
+  
+  // Rollei 120
+  { 
+    id: 'r_rpx100_120', brand: 'Rollei', name: 'RPX 100', type: '黑白负片', iso: 100, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#d6d3d1', colorEnd: '#44403c', textColor: '#000000'
+  },
+  { 
+    id: 'r_rpx400_120', brand: 'Rollei', name: 'RPX 400', type: '黑白负片', iso: 400, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#57534e', colorEnd: '#292524', textColor: '#ffffff'
+  },
+  
+  // Lucky 120
+  { 
+    id: 'l_shd100_120', brand: 'Lucky', name: 'SHD 100', type: '黑白负片', iso: 100, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fef3c7', colorEnd: '#b91c1c', textColor: '#000000'
+  },
+  { 
+    id: 'l_shd400_120', brand: 'Lucky', name: 'SHD 400', type: '黑白负片', iso: 400, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#fcd34d', colorEnd: '#7f1d1d', textColor: '#000000'
   },
 ];
 
@@ -166,7 +372,7 @@ export default function App() {
   // 新增：控制是否进入暗房工作台
   const [isWorkspaceActive, setIsWorkspaceActive] = useState(false);
   // 最近使用的胶卷
-  const [recentFilmIds, setRecentFilmIds] = useState<string[]>(['k_p400_135', 'i_hp5_135']);
+  const [recentFilmIds, setRecentFilmIds] = useState<string[]>([]);
 
   const COMMON_CAMERAS = [
     'Leica M6', 'Leica M3', 'Leica MP', 'Hasselblad 500C/M', 
@@ -195,6 +401,31 @@ export default function App() {
   // BMP 转换弹窗状态
   const [bmpDialog, setBmpDialog] = useState<{show: boolean, bmpFiles: any[], allFiles: any[], nonBmpFiles: any[]} | null>(null);
   const [isConverting, setIsConverting] = useState(false);
+
+  // 使用 useMemo 缓存搜索结果，避免每次输入都重新计算（必须在所有 hooks 之后、条件 return 之前）
+  const filteredFilms = useMemo(() => 
+    FILM_DATABASE.filter(film => 
+      film.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      film.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      film.type.includes(searchQuery)
+    ),
+    [searchQuery]
+  );
+
+  const recentFilms = useMemo(() => 
+    filteredFilms.filter(f => recentFilmIds.includes(f.id)),
+    [filteredFilms, recentFilmIds]
+  );
+  
+  // 品牌分组显示所有胶卷（包括最近使用的）
+  const groupedOtherFilms = useMemo(() => 
+    filteredFilms.reduce((acc, film) => {
+      if (!acc[film.brand]) acc[film.brand] = [];
+      acc[film.brand].push(film);
+      return acc;
+    }, {} as Record<string, typeof FILM_DATABASE>),
+    [filteredFilms]
+  );
 
   // 导入并扫描目录
   const handleSelectDirectory = async () => {
@@ -310,21 +541,6 @@ export default function App() {
     );
   }
 
-  const filteredFilms = FILM_DATABASE.filter(film => 
-    film.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    film.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    film.type.includes(searchQuery)
-  );
-
-  const recentFilms = filteredFilms.filter(f => recentFilmIds.includes(f.id));
-  const otherFilms = filteredFilms.filter(f => !recentFilmIds.includes(f.id));
-
-  const groupedOtherFilms = otherFilms.reduce((acc, film) => {
-    if (!acc[film.brand]) acc[film.brand] = [];
-    acc[film.brand].push(film);
-    return acc;
-  }, {} as Record<string, typeof FILM_DATABASE>);
-
   const FilmCard = ({ film }: { film: typeof FILM_DATABASE[0] }) => (
     <motion.div
       whileHover={{
@@ -336,7 +552,14 @@ export default function App() {
         }
       }}
       whileTap={{ scale: 0.98, y: 0, transition: { duration: 0.1 } }}
-      onClick={() => setSelectedFilm(film)}
+      onClick={() => {
+        setSelectedFilm(film);
+        // 记录到最近使用（去重 + 限制4个）
+        setRecentFilmIds(prev => {
+          const filtered = prev.filter(id => id !== film.id);
+          return [film.id, ...filtered].slice(0, 4);
+        });
+      }}
       className="flex flex-col bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden cursor-pointer group hover:border-zinc-700 hover:bg-zinc-800/50 shadow-lg hover:shadow-2xl hover:shadow-black/50 relative will-change-transform"
     >
       <div className={`h-56 w-full relative flex items-center justify-center overflow-hidden bg-black`}>
