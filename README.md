@@ -2,9 +2,10 @@
 
 一个专为胶卷摄影师设计的跨平台应用，用于**写入和管理数字化负片的完整 EXIF 元数据**。支持帧级精细参数调整，与 Apple Photos 和 Lightroom 完美集成。
 
-![Darkroom](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Status](https://img.shields.io/badge/Status-Active%20Development-brightgreen)
+[![Release](https://img.shields.io/github/v/release/veggiewang/darkroom?style=flat-square&color=blue)](https://github.com/veggiewang/darkroom/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/veggiewang/darkroom/total?style=flat-square&color=green)](https://github.com/veggiewang/darkroom/releases)
+![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 ## ✨ 核心功能
 
@@ -51,7 +52,26 @@
 - 批量写入 EXIF（一键处理整卷）
 - 详细的写入结果反馈
 
-## 🚀 快速开始
+## 📥 下载安装
+
+### 直接下载（推荐）
+
+前往 [**Releases 页面**](https://github.com/veggiewang/darkroom/releases/latest) 下载适合你系统的安装包：
+
+| 平台 | 文件类型 | 芯片架构 |
+|------|----------|----------|
+| 🍎 **macOS** | `.dmg` | Apple Silicon (M1/M2/M3) 或 Intel |
+| 🪟 **Windows** | `.msi` / `.exe` | x64 |
+| 🐧 **Linux** | `.deb` / `.AppImage` | x64 |
+
+> 💡 **macOS 用户**：首次打开可能提示"无法验证开发者"，请前往 **系统设置 → 隐私与安全性 → 仍要打开**
+
+---
+
+## 🚀 从源码构建
+
+<details>
+<summary>点击展开开发者指南</summary>
 
 ### 系统要求
 - **macOS 10.15+** / **Windows 10+** / **Linux**
@@ -74,6 +94,8 @@ npm run tauri dev
 # 生产构建（当前平台）
 npm run tauri build
 ```
+
+</details>
 
 ### 首次使用
 
