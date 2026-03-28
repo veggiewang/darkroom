@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
 use walkdir::WalkDir;
 use std::process::Command;
 

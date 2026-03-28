@@ -1,5 +1,3 @@
-use tauri::Builder;
-
 mod commands;
 
 pub fn run() {

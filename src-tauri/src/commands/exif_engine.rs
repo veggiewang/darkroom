@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tauri::{command, AppHandle, Manager};
 use std::process::Command;
-use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 pub struct ExifTask {
@@ -35,20 +34,7 @@ pub struct ProcessResult {
 pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Vec<ProcessResult>, String> {
     if tasks.is_empty() { return Ok(Vec::new()); }
 
-    // --- 寻找 ExifTool 资源路径 ---
-    // 根据系统动态确定调用命令
-    #[cfg(windows)]
-    let (perl_path, exiftool_pl) = {
-        let win_res = app.path().resource_dir().map_err(|e| e.to_string())?.join("resources/exiftool-win");
-        (win_res.join("perl.exe"), win_res.join("exiftool.pl"))
-    };
-
-    #[cfg(not(windows))]
-    let (perl_cmd, exiftool_pl, lib_dir) = {
-        let core_res = app.path().resource_dir().map_err(|e| e.to_string())?.join("resources/exiftool-core");
-        ("perl", core_res.join("exiftool"), core_res.join("lib"))
-    };
-
+    // --- 准备参数列表 ---
     let mut args = Vec::new();
 
     for (i, task) in tasks.iter().enumerate() {
@@ -118,24 +104,34 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
     args.push("-common_args".to_string());
     args.push("-overwrite_original".to_string());
 
-    // --- 执行命令 ---
-    let mut cmd = if cfg!(windows) {
-        let mut c = Command::new(perl_path);
-        c.arg(exiftool_pl);
-        c
-    } else {
-        let mut c = Command::new(perl_cmd);
-        c.env("PERL5LIB", lib_dir);
-        c.arg(exiftool_pl);
-        c
+    // --- 执行 ExifTool (区分平台调用) ---
+    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+
+    #[cfg(windows)]
+    let output = {
+        let win_res = resource_dir.join("resources/exiftool-win");
+        Command::new(win_res.join("perl.exe"))
+            .arg(win_res.join("exiftool.pl"))
+            .args(args)
+            .output()
+            .map_err(|e| format!("Windows Exec Error: {}", e))?
     };
 
-    let output = cmd.args(args).output().map_err(|e| format!("Process Error: {}", e))?;
+    #[cfg(not(windows))]
+    let output = {
+        let core_res = resource_dir.join("resources/exiftool-core");
+        Command::new("perl")
+            .env("PERL5LIB", core_res.join("lib"))
+            .arg(core_res.join("exiftool"))
+            .args(args)
+            .output()
+            .map_err(|e| format!("Unix Exec Error: {}", e))?
+    };
 
     if output.status.success() {
         Ok(tasks.into_iter().map(|t| ProcessResult { success: true, file_path: t.file_path, error_message: None }).collect())
     } else {
         let err = String::from_utf8_lossy(&output.stderr).to_string();
-        Err(format!("ExifTool Exec Error: {}", err))
+        Err(format!("ExifTool Error: {}", err))
     }
 }
