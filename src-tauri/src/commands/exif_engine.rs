@@ -35,17 +35,14 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
     if tasks.is_empty() { return Ok(Vec::new()); }
 
     let mut args = Vec::new();
-
     for (i, task) in tasks.iter().enumerate() {
         if task.file_path.to_lowercase().ends_with(".bmp") { continue; }
-
         if !task.camera_make_model.is_empty() {
             args.push(format!("-Model={}", task.camera_make_model));
             args.push(format!("-Make={}", task.camera_make_model));
         }
         if !task.lens.is_empty() { args.push(format!("-LensModel={}", task.lens)); }
         if !task.iso.is_empty() { args.push(format!("-ISO={}", task.iso)); }
-
         let mut comment_parts: Vec<String> = vec![format!("Film: {}", task.film_stock)];
         if let Some(loc) = &task.location {
             if !loc.is_empty() {
@@ -54,14 +51,9 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
                 args.push(format!("-XMP:City={}", loc));
             }
         }
-        if let Some(dev) = &task.developer {
-            if !dev.is_empty() { comment_parts.push(format!("Dev: {}", dev)); }
-        }
-        if let Some(scan) = &task.scanner {
-            if !scan.is_empty() { comment_parts.push(format!("Scanner: {}", scan)); }
-        }
+        if let Some(dev) = &task.developer { if !dev.is_empty() { comment_parts.push(format!("Dev: {}", dev)); } }
+        if let Some(scan) = &task.scanner { if !scan.is_empty() { comment_parts.push(format!("Scanner: {}", scan)); } }
         args.push(format!("-UserComment={}", comment_parts.join(" | ")));
-
         if let (Some(lat), Some(lon)) = (task.latitude, task.longitude) {
             let lat_ref = if lat >= 0.0 { "N" } else { "S" };
             let lon_ref = if lon >= 0.0 { "E" } else { "W" };
@@ -70,7 +62,6 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
             args.push(format!("-GPSLongitude={}", lon.abs()));
             args.push(format!("-GPSLongitudeRef={}", lon_ref));
         }
-
         if let Some(author) = &task.author {
             if !author.is_empty() {
                 args.push(format!("-Artist={}", author));
@@ -78,11 +69,7 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
                 args.push(format!("-Copyright=© {}", author));
             }
         }
-
-        if let Some(ev) = &task.ev {
-            if !ev.is_empty() { args.push(format!("-ExposureCompensation={}", ev)); }
-        }
-
+        if let Some(ev) = &task.ev { if !ev.is_empty() { args.push(format!("-ExposureCompensation={}", ev)); } }
         if let Some(date) = &task.date_shot {
             if !date.is_empty() {
                 let formatted = format!("{} 12:00:00", date.replace("-", ":"));
@@ -90,16 +77,13 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
                 args.push(format!("-CreateDate={}", formatted));
             }
         }
-
         if let Some(ap) = &task.aperture { if !ap.is_empty() { args.push(format!("-FNumber={}", ap)); } }
         if let Some(sh) = &task.shutter_speed { if !sh.is_empty() { args.push(format!("-ExposureTime={}", sh)); } }
         if let Some(fl) = &task.focal_length { if !fl.is_empty() { args.push(format!("-FocalLength={}", fl)); } }
         if let Some(n) = &task.notes { if !n.is_empty() { args.push(format!("-ImageDescription={}", n)); } }
-
         args.push(task.file_path.clone());
         if i < tasks.len() - 1 { args.push("-execute".to_string()); }
     }
-
     args.push("-common_args".to_string());
     args.push("-overwrite_original".to_string());
 
