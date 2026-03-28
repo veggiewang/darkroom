@@ -71,14 +71,10 @@ jobs:
             tar -xzf exiftool.tar.gz
             cd Image-ExifTool-$VERSION
             
-            # 创建包装器脚本
-            cat <<EOF > ../src-tauri/bin/exiftool-${{ matrix.target }}
-#!/bin/bash
-PERL5LIB="\$(dirname "\$0")/exiftool_data/lib" perl "\$(dirname "\$0")/exiftool_data/exiftool" "\$@"
-EOF
+            # 使用 printf 避免 heredoc 缩进问题
+            printf "#!/bin/bash\nPERL5LIB=\"\$(dirname \"\$0\")/exiftool_data/lib\" perl \"\$(dirname \"\$0\")/exiftool_data/exiftool\" \"\$@\"\n" > ../src-tauri/bin/exiftool-${{ matrix.target }}
             chmod +x ../src-tauri/bin/exiftool-${{ matrix.target }}
             
-            # 复制数据
             mkdir -p ../src-tauri/bin/exiftool_data
             cp -r exiftool lib ../src-tauri/bin/exiftool_data/
             cd ..
