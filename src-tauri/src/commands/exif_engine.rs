@@ -34,7 +34,6 @@ pub struct ProcessResult {
 pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Vec<ProcessResult>, String> {
     if tasks.is_empty() { return Ok(Vec::new()); }
 
-    // --- 准备参数列表 ---
     let mut args = Vec::new();
 
     for (i, task) in tasks.iter().enumerate() {
@@ -104,7 +103,6 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
     args.push("-common_args".to_string());
     args.push("-overwrite_original".to_string());
 
-    // --- 执行 ExifTool (区分平台调用) ---
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
 
     #[cfg(windows)]
