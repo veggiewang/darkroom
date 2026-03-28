@@ -37,8 +37,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "bin/exiftool"
+    "resources": [
+      "resources/exiftool-core/**/*",
+      "resources/exiftool-win/**/*"
     ]
   }
 }

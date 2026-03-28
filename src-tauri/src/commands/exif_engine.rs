@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::{command, AppHandle, Manager};
-use tauri_plugin_shell::ShellExt;
-use std::path::Path;
+use std::process::Command;
+use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 pub struct ExifTask {
@@ -33,45 +33,40 @@ pub struct ProcessResult {
 
 #[command]
 pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Vec<ProcessResult>, String> {
-    if tasks.is_empty() {
-        return Ok(Vec::new());
-    }
+    if tasks.is_empty() { return Ok(Vec::new()); }
 
-    // --- 批量参数构建 ---
-    // 为了极致性能，我们构建一个“参数列表”。
-    // ExifTool 支持在单次调用中使用 -execute 处理多个文件。
-    // 语法：exiftool [FILE1_ARGS] FILE1 -execute [FILE2_ARGS] FILE2 -common_args -overwrite_original
-    
+    // --- 寻找 ExifTool 资源路径 ---
+    // 根据系统动态确定调用命令
+    #[cfg(windows)]
+    let (perl_path, exiftool_pl) = {
+        let win_res = app.path().resource_dir().map_err(|e| e.to_string())?.join("resources/exiftool-win");
+        (win_res.join("perl.exe"), win_res.join("exiftool.pl"))
+    };
+
+    #[cfg(not(windows))]
+    let (perl_cmd, exiftool_pl, lib_dir) = {
+        let core_res = app.path().resource_dir().map_err(|e| e.to_string())?.join("resources/exiftool-core");
+        ("perl", core_res.join("exiftool"), core_res.join("lib"))
+    };
+
     let mut args = Vec::new();
 
     for (i, task) in tasks.iter().enumerate() {
-        // BMP 跳过处理
-        let lower_path = task.file_path.to_lowercase();
-        if lower_path.ends_with(".bmp") {
-            continue; 
-        }
+        if task.file_path.to_lowercase().ends_with(".bmp") { continue; }
 
-        // 基础信息
         if !task.camera_make_model.is_empty() {
             args.push(format!("-Model={}", task.camera_make_model));
             args.push(format!("-Make={}", task.camera_make_model));
         }
-        
-        if !task.lens.is_empty() {
-            args.push(format!("-LensModel={}", task.lens));
-        }
+        if !task.lens.is_empty() { args.push(format!("-LensModel={}", task.lens)); }
+        if !task.iso.is_empty() { args.push(format!("-ISO={}", task.iso)); }
 
-        if !task.iso.is_empty() {
-            args.push(format!("-ISO={}", task.iso));
-        }
-
-        // 构建 UserComment
         let mut comment_parts: Vec<String> = vec![format!("Film: {}", task.film_stock)];
-        if let Some(location) = &task.location {
-            if !location.is_empty() {
-                comment_parts.push(format!("Location: {}", location));
-                args.push(format!("-IPTC:City={}", location));
-                args.push(format!("-XMP:City={}", location));
+        if let Some(loc) = &task.location {
+            if !loc.is_empty() {
+                comment_parts.push(format!("Location: {}", loc));
+                args.push(format!("-IPTC:City={}", loc));
+                args.push(format!("-XMP:City={}", loc));
             }
         }
         if let Some(dev) = &task.developer {
@@ -82,7 +77,6 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
         }
         args.push(format!("-UserComment={}", comment_parts.join(" | ")));
 
-        // GPS
         if let (Some(lat), Some(lon)) = (task.latitude, task.longitude) {
             let lat_ref = if lat >= 0.0 { "N" } else { "S" };
             let lon_ref = if lon >= 0.0 { "E" } else { "W" };
@@ -92,7 +86,6 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
             args.push(format!("-GPSLongitudeRef={}", lon_ref));
         }
 
-        // 作者
         if let Some(author) = &task.author {
             if !author.is_empty() {
                 args.push(format!("-Artist={}", author));
@@ -101,66 +94,48 @@ pub async fn write_exif_batch(app: AppHandle, tasks: Vec<ExifTask>) -> Result<Ve
             }
         }
 
-        // 曝光 & 日期
         if let Some(ev) = &task.ev {
             if !ev.is_empty() { args.push(format!("-ExposureCompensation={}", ev)); }
         }
 
         if let Some(date) = &task.date_shot {
             if !date.is_empty() {
-                let formatted_date = format!("{} 12:00:00", date.replace("-", ":"));
-                args.push(format!("-DateTimeOriginal={}", formatted_date));
-                args.push(format!("-CreateDate={}", formatted_date));
+                let formatted = format!("{} 12:00:00", date.replace("-", ":"));
+                args.push(format!("-DateTimeOriginal={}", formatted));
+                args.push(format!("-CreateDate={}", formatted));
             }
         }
 
-        // 帧特定
-        if let Some(aperture) = &task.aperture {
-            if !aperture.is_empty() { args.push(format!("-FNumber={}", aperture)); }
-        }
-        if let Some(shutter) = &task.shutter_speed {
-            if !shutter.is_empty() { args.push(format!("-ExposureTime={}", shutter)); }
-        }
-        if let Some(focal) = &task.focal_length {
-            if !focal.is_empty() { args.push(format!("-FocalLength={}", focal)); }
-        }
-        if let Some(notes) = &task.notes {
-            if !notes.is_empty() { args.push(format!("-ImageDescription={}", notes)); }
-        }
+        if let Some(ap) = &task.aperture { if !ap.is_empty() { args.push(format!("-FNumber={}", ap)); } }
+        if let Some(sh) = &task.shutter_speed { if !sh.is_empty() { args.push(format!("-ExposureTime={}", sh)); } }
+        if let Some(fl) = &task.focal_length { if !fl.is_empty() { args.push(format!("-FocalLength={}", fl)); } }
+        if let Some(n) = &task.notes { if !n.is_empty() { args.push(format!("-ImageDescription={}", n)); } }
 
-        // 文件路径
         args.push(task.file_path.clone());
-
-        // 如果不是最后一个任务，添加 -execute 分隔符
-        if i < tasks.len() - 1 {
-            args.push("-execute".to_string());
-        }
+        if i < tasks.len() - 1 { args.push("-execute".to_string()); }
     }
 
-    // 添加公共参数（对所有文件有效，放在最后）
     args.push("-common_args".to_string());
     args.push("-overwrite_original".to_string());
 
-    // --- 调用 Sidecar (内嵌的 exiftool) ---
-    // Tauri 会根据系统自动查找 bin/exiftool-x86_64-apple-darwin 等
-    let sidecar_command = app.shell().sidecar("exiftool").map_err(|e| e.to_string())?;
-    
-    let output = sidecar_command
-        .args(args)
-        .output()
-        .await
-        .map_err(|e| format!("Sidecar execution failed: {}", e))?;
+    // --- 执行命令 ---
+    let mut cmd = if cfg!(windows) {
+        let mut c = Command::new(perl_path);
+        c.arg(exiftool_pl);
+        c
+    } else {
+        let mut c = Command::new(perl_cmd);
+        c.env("PERL5LIB", lib_dir);
+        c.arg(exiftool_pl);
+        c
+    };
+
+    let output = cmd.args(args).output().map_err(|e| format!("Process Error: {}", e))?;
 
     if output.status.success() {
-        // 简单处理结果，由于是批量，这里假设全成功
-        // 实际上可以解析 stdout 进一步确认
-        Ok(tasks.into_iter().map(|t| ProcessResult {
-            success: true,
-            file_path: t.file_path,
-            error_message: None,
-        }).collect())
+        Ok(tasks.into_iter().map(|t| ProcessResult { success: true, file_path: t.file_path, error_message: None }).collect())
     } else {
-        let err_msg = String::from_utf8_lossy(&output.stderr).to_string();
-        Err(format!("ExifTool Error: {}", err_msg))
+        let err = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("ExifTool Exec Error: {}", err))
     }
 }
