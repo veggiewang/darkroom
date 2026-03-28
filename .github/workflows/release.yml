@@ -31,6 +31,8 @@ jobs:
             name: Linux-x64
 
     runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout repository
