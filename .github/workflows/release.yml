@@ -60,18 +60,25 @@ jobs:
         shell: bash
         run: |
           mkdir -p src-tauri/bin
-          VERSION="13.25"
+          VERSION="13.10" # 使用一个极其稳定的已知版本
           
           if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
-            curl -L "https://exiftool.org/exiftool-$VERSION.zip" -o exiftool.zip
+            # Windows: 增加 User-Agent 伪装，从官方或镜像下载
+            echo "Downloading ExifTool for Windows..."
+            curl -A "Mozilla/5.0" -L "https://exiftool.org/exiftool-$VERSION.zip" -o exiftool.zip || \
+            curl -L "https://github.com/veggiewang/darkroom/releases/download/v0.0.1/exiftool-$VERSION.zip" -o exiftool.zip # 备选
+            
             unzip exiftool.zip
             mv "exiftool(-k).exe" "src-tauri/bin/exiftool-${{ matrix.target }}.exe"
           else
-            curl -L "https://exiftool.org/Image-ExifTool-$VERSION.tar.gz" -o exiftool.tar.gz
-            tar -xzf exiftool.tar.gz
-            cd Image-ExifTool-$VERSION
+            # Mac/Linux: 直接从 GitHub 获取源码包，速度快且稳定
+            echo "Downloading ExifTool Source from GitHub..."
+            curl -L "https://github.com/exiftool/exiftool/archive/refs/tags/$VERSION.tar.gz" -o exiftool.tar.gz
             
-            # 使用 printf 避免 heredoc 缩进问题
+            tar -xzf exiftool.tar.gz
+            cd "exiftool-$VERSION"
+            
+            # 创建包装器脚本
             printf "#!/bin/bash\nPERL5LIB=\"\$(dirname \"\$0\")/exiftool_data/lib\" perl \"\$(dirname \"\$0\")/exiftool_data/exiftool\" \"\$@\"\n" > ../src-tauri/bin/exiftool-${{ matrix.target }}
             chmod +x ../src-tauri/bin/exiftool-${{ matrix.target }}
             
@@ -100,8 +107,8 @@ jobs:
             ## 🆕 更新内容
             
             - 胶片 EXIF 元数据批量写入（高性能集成版）
-            - 支持 135/120 多种胶卷型号
-            - 暗房工作台可视化编辑
+            - 内嵌 ExifTool，无需配置环境变量
+            - 修复了 CI 编译过程中的下载源稳定性问题
             
             ---
             
