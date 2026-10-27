@@ -17,12 +17,29 @@ const MOCK_FRAMES: FrameMetadata[] = Array.from({ length: 36 }).map((_, i) => ({
   fileName: `IMG_${1000 + i}.jpg`,
 }));
 
+// 从定焦镜头名里取焦距，如 "Summicron 35mm f/2" -> "35"；变焦镜头 (24-70mm) 不猜
+function parseFocalLength(lens?: string): string | undefined {
+  if (!lens || /\d\s*-\s*\d+\s*mm/i.test(lens)) return undefined;
+  return lens.match(/(\d+(?:\.\d+)?)\s*mm/i)?.[1];
+}
+
 export default function WorkspaceCanvas({ rollMetadata, onBack }: WorkspaceProps) {
+  // 每一帧默认带上整卷录入时填写的信息，单帧里可再改
+  const rollDefaults: Partial<FrameMetadata> = {
+    iso: rollMetadata?.iso || (rollMetadata?.filmStock ? `${rollMetadata.filmStock.iso}` : undefined),
+    ev: rollMetadata?.ev || undefined,
+    location: rollMetadata?.location || undefined,
+    latitude: rollMetadata?.latitude,
+    longitude: rollMetadata?.longitude,
+    focalLength: parseFocalLength(rollMetadata?.lens),
+  };
+
   // 如果有真实导入的文件，就使用它们，否则使用占位符
   let initialFrames: FrameMetadata[];
   try {
     initialFrames = rollMetadata?.importedFiles && rollMetadata.importedFiles.length > 0
       ? rollMetadata.importedFiles.map((file: any, i: number) => ({
+          ...rollDefaults,
           id: `frame-${i + 1}`,
           filePath: typeof file === 'string' ? file : file.path,
           fileName: typeof file === 'string' ? (file.split('/').pop() || `frame-${i+1}`) : file.name,

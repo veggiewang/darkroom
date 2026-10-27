@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, ChevronRight, X, Upload, Camera, Aperture, Calendar, Film, Store, ScanLine, User, Gauge } from 'lucide-react';
+import { Search, ChevronRight, X, Upload, Camera, Aperture, Calendar, Film, Store, ScanLine, User, Gauge, Plus, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -9,6 +9,8 @@ import { VectorFilmCanister } from './components/VectorFilmCanister';
 import { AutocompleteInput } from './components/AutocompleteInput';
 import { LocationInput } from './components/LocationInput';
 import type { FilmStock, RollMetadata } from './types';
+import { loadCustomFilms, saveCustomFilms, loadCustomList, saveCustomList } from './lib/customStore';
+import type { CustomListKind } from './lib/customStore';
 
 // 生成胶片盒的噪点质感
 // @ts-ignore - used by inline styles
@@ -223,6 +225,12 @@ const FILM_DATABASE: FilmStock[] = [
     boxStyle: '', accent: '', colorStart: '#57534e', colorEnd: '#292524', textColor: '#ffffff'
   },
 
+  // === 135 FORMAT - LOMOGRAPHY ===
+  { 
+    id: 'lo_200_135', brand: 'Lomography', name: 'Lomo 200', type: '彩色负片', iso: 200, format: '135', popular: true,
+    boxStyle: '', accent: '', colorStart: '#f472b6', colorEnd: '#7c3aed', textColor: '#ffffff'
+  },
+
   // === 120 FORMAT ===
   // Kodak 120
   { 
@@ -352,6 +360,12 @@ const FILM_DATABASE: FilmStock[] = [
     boxStyle: '', accent: '', colorStart: '#57534e', colorEnd: '#292524', textColor: '#ffffff'
   },
   
+  // Lomography 120
+  { 
+    id: 'lo_200_120', brand: 'Lomography', name: 'Lomo 200', type: '彩色负片', iso: 200, format: '120', popular: false,
+    boxStyle: '', accent: '', colorStart: '#f472b6', colorEnd: '#7c3aed', textColor: '#ffffff'
+  },
+
   // Lucky 120
   { 
     id: 'l_shd100_120', brand: 'Lucky', name: 'SHD 100', type: '黑白负片', iso: 100, format: '120', popular: false,
@@ -373,6 +387,14 @@ export default function App() {
   const [isWorkspaceActive, setIsWorkspaceActive] = useState(false);
   // 最近使用的胶卷
   const [recentFilmIds, setRecentFilmIds] = useState<string[]>([]);
+  // 用户自定义的胶卷 / 相机 / 镜头 / 扫描仪（本机保存）
+  const [customFilms, setCustomFilms] = useState<FilmStock[]>(loadCustomFilms);
+  const [customLists, setCustomLists] = useState<Record<CustomListKind, string[]>>(() => ({
+    cameras: loadCustomList('cameras'),
+    lenses: loadCustomList('lenses'),
+    scanners: loadCustomList('scanners'),
+  }));
+  const [customFilmDraft, setCustomFilmDraft] = useState<{ brand: string; name: string; iso: string; format: '135' | '120'; type: string } | null>(null);
 
   const COMMON_CAMERAS = [
     'Leica M6', 'Leica M3', 'Leica MP', 'Hasselblad 500C/M', 
@@ -389,6 +411,7 @@ export default function App() {
   ];
 
   const COMMON_SCANNERS = [
+    'QS3233',
     'Fujifilm Frontier SP3000', 'Fujifilm Frontier SP500', 
     'Noritsu HS-1800', 'Noritsu LS-600', 'Noritsu HS-1100',
     'Hasselblad Flextight X5', 'Hasselblad Flextight X1',
@@ -402,14 +425,69 @@ export default function App() {
   const [bmpDialog, setBmpDialog] = useState<{show: boolean, bmpFiles: any[], allFiles: any[], nonBmpFiles: any[]} | null>(null);
   const [isConverting, setIsConverting] = useState(false);
 
+  const allFilms = useMemo(() => [...FILM_DATABASE, ...customFilms], [customFilms]);
+
+  const BUILTIN_OPTIONS: Record<CustomListKind, string[]> = {
+    cameras: COMMON_CAMERAS,
+    lenses: COMMON_LENSES,
+    scanners: COMMON_SCANNERS,
+  };
+
+  const addCustomOption = (kind: CustomListKind, name: string) => {
+    setCustomLists(prev => {
+      if (BUILTIN_OPTIONS[kind].includes(name) || prev[kind].includes(name)) return prev;
+      const next = [name, ...prev[kind]];
+      saveCustomList(kind, next);
+      return { ...prev, [kind]: next };
+    });
+  };
+
+  const removeCustomOption = (kind: CustomListKind, name: string) => {
+    setCustomLists(prev => {
+      const next = prev[kind].filter(s => s !== name);
+      saveCustomList(kind, next);
+      return { ...prev, [kind]: next };
+    });
+  };
+
+  const saveCustomFilm = () => {
+    if (!customFilmDraft) return;
+    const brand = customFilmDraft.brand.trim();
+    const name = customFilmDraft.name.trim();
+    const iso = parseInt(customFilmDraft.iso, 10);
+    if (!brand || !name || !iso || iso <= 0) {
+      alert('请填写品牌、名称和有效的 ISO');
+      return;
+    }
+    const film: FilmStock = {
+      id: `custom_${Date.now()}`,
+      brand, name, iso,
+      format: customFilmDraft.format,
+      type: customFilmDraft.type || '彩色负片',
+      boxStyle: '', accent: '',
+      colorStart: '#a1a1aa', colorEnd: '#3f3f46', textColor: '#ffffff',
+    };
+    const next = [...customFilms, film];
+    setCustomFilms(next);
+    saveCustomFilms(next);
+    setCustomFilmDraft(null);
+  };
+
+  const removeCustomFilm = (id: string) => {
+    const next = customFilms.filter(f => f.id !== id);
+    setCustomFilms(next);
+    saveCustomFilms(next);
+    setRecentFilmIds(prev => prev.filter(r => r !== id));
+  };
+
   // 使用 useMemo 缓存搜索结果，避免每次输入都重新计算（必须在所有 hooks 之后、条件 return 之前）
   const filteredFilms = useMemo(() => 
-    FILM_DATABASE.filter(film => 
+    allFilms.filter(film => 
       film.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
       film.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
       film.type.includes(searchQuery)
     ),
-    [searchQuery]
+    [searchQuery, allFilms]
   );
 
   const recentFilms = useMemo(() => 
@@ -423,7 +501,7 @@ export default function App() {
       if (!acc[film.brand]) acc[film.brand] = [];
       acc[film.brand].push(film);
       return acc;
-    }, {} as Record<string, typeof FILM_DATABASE>),
+    }, {} as Record<string, FilmStock[]>),
     [filteredFilms]
   );
 
@@ -512,6 +590,14 @@ export default function App() {
       }
       
       setRollData({ ...rollData, filmStock: selectedFilm });
+
+      // 手动输入的新相机 / 镜头 / 扫描仪自动记住，下次可直接选
+      const camera = rollData.cameraMakeModel?.trim();
+      const lens = rollData.lens?.trim();
+      const scanner = rollData.scanner?.trim();
+      if (camera) addCustomOption('cameras', camera);
+      if (lens) addCustomOption('lenses', lens);
+      if (scanner) addCustomOption('scanners', scanner);
       
       // 添加到最近使用
       setRecentFilmIds(prev => {
@@ -541,7 +627,7 @@ export default function App() {
     );
   }
 
-  const FilmCard = ({ film }: { film: typeof FILM_DATABASE[0] }) => (
+  const FilmCard = ({ film }: { film: FilmStock }) => (
     <motion.div
       whileHover={{
         y: -4,
@@ -563,6 +649,18 @@ export default function App() {
       className="flex flex-col bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden cursor-pointer group hover:border-zinc-700 hover:bg-zinc-800/50 shadow-lg hover:shadow-2xl hover:shadow-black/50 relative will-change-transform"
     >
       <div className={`h-56 w-full relative flex items-center justify-center overflow-hidden bg-black`}>
+        {film.id.startsWith('custom_') && (
+          <button
+            title="删除自定义胶卷"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm(`删除自定义胶卷 ${film.brand} ${film.name}？`)) removeCustomFilm(film.id);
+            }}
+            className="absolute top-3 right-3 z-40 p-1.5 rounded-full bg-black/60 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
         {/* Vector 3D Film Canister */}
         <div className="z-10 transition-transform duration-500 ease-out group-hover:scale-110 group-hover:-translate-y-2">
           <VectorFilmCanister 
@@ -612,6 +710,14 @@ export default function App() {
           <p className="text-zinc-400 text-lg">选择胶卷，进入暗房工作台</p>
         </div>
         
+        <div className="flex items-center gap-3">
+        <button
+          onClick={() => setCustomFilmDraft({ brand: '', name: '', iso: '', format: '135', type: '彩色负片' })}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
+        >
+          <Plus size={16} />
+          自定义胶卷
+        </button>
         <div className="relative group w-72">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-zinc-500 group-focus-within:text-zinc-300">
             <Search size={16} />
@@ -623,6 +729,7 @@ export default function App() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+        </div>
         </div>
       </div>
 
@@ -729,6 +836,9 @@ export default function App() {
                        onChange={val => setRollData({...rollData, cameraMakeModel: val})}
                        placeholder="例如: Leica M6"
                        options={COMMON_CAMERAS}
+                       customOptions={customLists.cameras}
+                       onAddCustom={val => addCustomOption('cameras', val)}
+                       onRemoveCustom={val => removeCustomOption('cameras', val)}
                      />
                    </div>
                    <div className="space-y-2">
@@ -741,6 +851,9 @@ export default function App() {
                        onChange={val => setRollData({...rollData, lens: val})}
                        placeholder="例如: Summicron 35mm"
                        options={COMMON_LENSES}
+                       customOptions={customLists.lenses}
+                       onAddCustom={val => addCustomOption('lenses', val)}
+                       onRemoveCustom={val => removeCustomOption('lenses', val)}
                      />
                    </div>
                    <div className="space-y-2">
@@ -788,6 +901,9 @@ export default function App() {
                        onChange={val => setRollData({...rollData, scanner: val})}
                        placeholder="例如: Noritsu HS-1800"
                        options={COMMON_SCANNERS}
+                       customOptions={customLists.scanners}
+                       onAddCustom={val => addCustomOption('scanners', val)}
+                       onRemoveCustom={val => removeCustomOption('scanners', val)}
                      />
                    </div>
                    <div className="space-y-2">
@@ -883,6 +999,81 @@ export default function App() {
                  >
                    进入暗房工作台
                  </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 自定义胶卷弹窗 */}
+      <AnimatePresence>
+        {customFilmDraft && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={() => setCustomFilmDraft(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
+                <h3 className="text-lg font-bold text-white">添加自定义胶卷</h3>
+                <button onClick={() => setCustomFilmDraft(null)} className="p-1 text-zinc-400 hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-6 grid grid-cols-2 gap-4">
+                {([
+                  ['brand', '品牌', '例如: Lomography'],
+                  ['name', '名称', '例如: Color 100'],
+                  ['iso', 'ISO', '例如: 200'],
+                  ['type', '类型', '例如: 彩色负片'],
+                ] as const).map(([key, label, ph]) => (
+                  <div key={key} className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-400">{label}</label>
+                    <input
+                      type="text"
+                      inputMode={key === 'iso' ? 'numeric' : undefined}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-zinc-100 focus:border-zinc-600 outline-none transition-all placeholder:text-zinc-700"
+                      placeholder={ph}
+                      value={customFilmDraft[key]}
+                      onChange={e => setCustomFilmDraft({ ...customFilmDraft, [key]: e.target.value })}
+                    />
+                  </div>
+                ))}
+                <div className="space-y-2 col-span-2">
+                  <label className="text-sm font-medium text-zinc-400">画幅</label>
+                  <div className="flex gap-2">
+                    {(['135', '120'] as const).map(fmt => (
+                      <button
+                        key={fmt}
+                        onClick={() => setCustomFilmDraft({ ...customFilmDraft, format: fmt })}
+                        className={`px-5 py-2 rounded-xl border text-sm font-bold transition-colors ${
+                          customFilmDraft.format === fmt
+                            ? 'bg-white text-black border-white'
+                            : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:border-zinc-600'
+                        }`}
+                      >
+                        {fmt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-zinc-800 bg-zinc-950/80 flex justify-end gap-3">
+                <button onClick={() => setCustomFilmDraft(null)} className="px-5 py-2 text-sm text-zinc-400 hover:text-white font-medium transition-colors">
+                  取消
+                </button>
+                <button onClick={saveCustomFilm} className="px-5 py-2 text-sm bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors">
+                  保存
+                </button>
               </div>
             </motion.div>
           </motion.div>
